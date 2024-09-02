@@ -158,11 +158,13 @@ class LTI13Authenticator(Authenticator):
     def config_json_url(self, base_url):
         return url_path_join(base_url, "lti13", "config")
 
-    def get_handlers(self, app: JupyterHub) -> List[BaseHandler]:
+    def get_handlers(self, app: JupyterHub):
         return [
-            (self.login_url(""), self.login_handler),
-            (self.callback_url(""), self.callback_handler),
-            (self.config_json_url(""), self.config_handler),
+            # no self.login_url, self.callback_url and self.config_json_url calls since they will be overridden by
+            # multiauthenticator which injects the url scope (URLs without scope are required)
+            (url_path_join("lti13", "oauth_login"), self.login_handler),
+            (url_path_join("lti13", "oauth_callback"), self.callback_handler),
+            (url_path_join("lti13", "config"), self.config_handler),
         ]
 
     async def authenticate(
