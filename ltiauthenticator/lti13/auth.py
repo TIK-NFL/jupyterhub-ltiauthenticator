@@ -34,6 +34,8 @@ class LTI13Authenticator(Authenticator):
 
     login_service = "LTI 1.3"
 
+    ui_login = False
+
     # handlers used for login, callback, and json config endpoints
     login_handler = LTI13LoginInitHandler
     callback_handler = LTI13CallbackHandler
