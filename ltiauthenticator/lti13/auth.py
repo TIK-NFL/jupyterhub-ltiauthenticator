@@ -185,7 +185,7 @@ class LTI13Authenticator(Authenticator):
         if not data:
             data = {}
 
-        username = self.get_username(data)
+        username = "lti+" + self.get_username(data)
 
         return {
             "name": username,
