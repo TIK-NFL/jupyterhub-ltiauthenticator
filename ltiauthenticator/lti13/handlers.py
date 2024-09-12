@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import hashlib
 import json
@@ -7,7 +8,7 @@ from typing import Any, Dict, Optional, cast
 from urllib.parse import quote, unquote, urlparse
 
 from jupyterhub.handlers import BaseHandler  # type: ignore
-from jupyterhub.utils import url_path_join  # type: ignore
+from jupyterhub.utils import url_path_join, maybe_future  # type: ignore
 from oauthlib.common import generate_token  # type: ignore
 from tornado.httputil import url_concat
 from tornado.log import app_log
@@ -393,6 +394,20 @@ class LTI13CallbackHandler(BaseHandler):
         self.log.debug(f"user logged in: {user}")
         if user is None:
             raise HTTPError(403, "User missing or null")
+
+        # Shutdown any already running servers for this user, which results in re-spawning.
+        active_servers = [
+            name
+            for (name, spawner) in user.spawners.items()
+            if spawner.active and not spawner.pending
+        ]
+        if active_servers:
+            self.log.info("Shutting down %s's servers", user.name)
+            futures = []
+            for server_name in active_servers:
+                futures.append(maybe_future(self.stop_single_user(user, server_name)))
+            await asyncio.gather(*futures)
+
         await self.redirect_to_next_url(user)
 
     async def redirect_to_next_url(self, user):
