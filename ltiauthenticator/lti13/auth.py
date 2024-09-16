@@ -34,12 +34,34 @@ class LTI13Authenticator(Authenticator):
 
     login_service = "LTI 1.3"
 
+    username_lti_prefix = 'lti+'
+
     ui_login = False
 
     # handlers used for login, callback, and json config endpoints
     login_handler = LTI13LoginInitHandler
     callback_handler = LTI13CallbackHandler
     config_handler = LTI13ConfigHandler
+
+    username_source = Unicode(
+        "common",
+        allow_none=False,
+        config=True,
+        help="""
+        Username source definition passed to authenticated users. Possible values are 'lms_username' which represents
+        the Login username of the respective LMS or 'common' which uses the value defined by LTI settings within the LMS
+        (e.g. email address). 
+        """,
+    )
+
+    home_org_username_prefix = Unicode(
+        "",
+        allow_none=False,
+        config=True,
+        help="""
+        The organization abbreviation used as username prefix for username uniqueness across multiple organisations.   
+        """,
+    )
 
     authorize_url = Unicode(
         config=True,
@@ -185,7 +207,7 @@ class LTI13Authenticator(Authenticator):
         if not data:
             data = {}
 
-        username = "lti+" + self.get_username(data)
+        username = self.get_username(data)
 
         return {
             "name": username,
@@ -211,15 +233,34 @@ class LTI13Authenticator(Authenticator):
             username_key = username_key[len("custom_") :]
 
         username = data.get(username_key)
+
+        # Determine the username depending on the calling platform
+        if self.username_source == 'lms_username':
+            platform_family_code = data['https://purl.imsglobal.org/spec/lti/claim/tool_platform']['product_family_code'].lower()
+            if platform_family_code == 'ilias':
+                # ILIAS passes the username through 'email' or 'sub' only!
+                username = data['email'].split('@')[0]
+            elif platform_family_code == 'moodle':
+                username = data['https://purl.imsglobal.org/spec/lti/claim/ext']['user_username']
+            else:
+                logger.warning(f"Could not extract LMS-specific username. "
+                               f"Falling back to determination by key '{username_key}'.")
+
         if not username:
             logger.warning(
-                f"Cannot find the key {username_key} in the ID token. `sub` used instread."
+                f"Cannot find the key {username_key} in the ID token. `sub` used instead."
             )
             username = token.get("sub")
         if not username:
             raise LoginError(
                 f"Unable to set the username with username_key {username_key}"
             )
+
+        if self.home_org_username_prefix:
+            username = str(self.home_org_username_prefix) + '_' + username
+
+        username = self.username_lti_prefix + username
+
         return username
 
     def get_uri_scheme(self, request) -> str:
