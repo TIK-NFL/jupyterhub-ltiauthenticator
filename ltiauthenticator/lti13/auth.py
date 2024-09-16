@@ -5,7 +5,7 @@ from jupyterhub.app import JupyterHub  # type: ignore
 from jupyterhub.auth import Authenticator  # type: ignore
 from jupyterhub.handlers import BaseHandler  # type: ignore
 from jupyterhub.utils import url_path_join  # type: ignore
-from traitlets import CaselessStrEnum
+from traitlets import CaselessStrEnum, Bool
 from traitlets import List as TraitletsList
 from traitlets import Set as TraitletsSet
 from traitlets import Unicode
@@ -60,6 +60,15 @@ class LTI13Authenticator(Authenticator):
         config=True,
         help="""
         The organization abbreviation used as username prefix for username uniqueness across multiple organisations.   
+        """,
+    )
+
+    use_lti_prefix = Bool(
+        False,
+        allow_none=False,
+        config=True,
+        help="""
+        If true, a defined LTI prefix will be prepended to the username.   
         """,
     )
 
@@ -256,10 +265,8 @@ class LTI13Authenticator(Authenticator):
                 f"Unable to set the username with username_key {username_key}"
             )
 
-        if self.home_org_username_prefix:
-            username = str(self.home_org_username_prefix) + '_' + username
-
-        username = self.username_lti_prefix + username
+        username = str(self.home_org_username_prefix) + '_' + username if self.home_org_username_prefix else username
+        username = self.username_lti_prefix + username if self.use_lti_prefix else username
 
         return username
 
